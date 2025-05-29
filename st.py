@@ -7,6 +7,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import search
 import nest_asyncio
 import asyncio
+import hashlib
+import file_upload
 
 nest_asyncio.apply()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -23,6 +25,15 @@ client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.getenv("GROQ_API_KEY")
 )
+
+uploaded_file = st.file_uploader("Choose a file", type="pdf")
+if uploaded_file is not None:
+    bytesdata = uploaded_file.getvalue()
+    hash = hashlib.md5(bytesdata).hexdigest()
+    with open(f"{hash[:7]}.pdf", "w") as f:
+        f.write(bytesdata)
+    totalMD = file_upload.pdfLoader(f"{hash[:7]}.pdf")
+    file_upload.createStore(totalMD, hash[:7])
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

@@ -11,17 +11,12 @@ from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 
-
+hash = "NaN"
 text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
     encoding_name="cl100k_base", chunk_size=100, chunk_overlap=0
 )
 
 embedding_model = HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
-vector_store = Chroma(
-    collection_name="test",
-    embedding_function = embedding_model,
-    persist_directory="/Users/prathamwankhede/Documents/scribe/"
-)
 
 def imgToMDRouter(img):
     dotenv.load_dotenv()
@@ -136,7 +131,13 @@ async def pdfLoader(path):
         totalmarkdown += imgToMDRouter(img)
     return totalmarkdown
 
-def createStore(totalMD):
+def createStore(totalMD, filehash):
+    vector_store = Chroma(
+        collection_name=f"{filehash}>",
+        embedding_function = embedding_model,
+        persist_directory="./"
+    )
+    hash = filehash
     texts = text_splitter.split_text(totalMD)
     docs=[]
     for i in range(len(texts)):

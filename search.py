@@ -2,12 +2,13 @@ from openai import OpenAI
 import os
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+import file_upload
 
 embedding_model = HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
 vector_store = Chroma(
-    collection_name="test",
+    collection_name=f"{file_upload.hash}",
     embedding_function = embedding_model,
-    persist_directory="/Users/prathamwankhede/Documents/scribe/"
+    persist_directory="./"
 )
 
 
