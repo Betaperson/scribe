@@ -10,6 +10,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
+import asyncio
 
 hash = "NaN"
 text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
@@ -133,7 +134,7 @@ async def pdfLoader(path):
 
 def createStore(totalMD, filehash):
     vector_store = Chroma(
-        collection_name=f"{filehash}>",
+        collection_name=f"{filehash}",
         embedding_function = embedding_model,
         persist_directory="./"
     )

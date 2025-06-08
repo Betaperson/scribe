@@ -11,15 +11,9 @@ import hashlib
 import file_upload
 
 nest_asyncio.apply()
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+#os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-
-embedding_model = HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
-vector_store = Chroma(
-    collection_name="test",
-    embedding_function = embedding_model,
-    persist_directory="/Users/prathamwankhede/Documents/scribe/"
-)   
+global hash
 
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
@@ -30,9 +24,9 @@ uploaded_file = st.file_uploader("Choose a file", type="pdf")
 if uploaded_file is not None:
     bytesdata = uploaded_file.getvalue()
     hash = hashlib.md5(bytesdata).hexdigest()
-    with open(f"{hash[:7]}.pdf", "w") as f:
+    with open(f"{hash[:7]}.pdf", "wb") as f:
         f.write(bytesdata)
-    totalMD = file_upload.pdfLoader(f"{hash[:7]}.pdf")
+    totalMD = asyncio.run(file_upload.pdfLoader(f"{hash[:7]}.pdf"))
     file_upload.createStore(totalMD, hash[:7])
 
 if "messages" not in st.session_state:
@@ -43,9 +37,9 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 if prompt := st.chat_input("Type to get started."):
-    results = search.search(prompt, 5)
+    results = search.search(prompt, 5, hash)
     prompt_template=f"""
-        You are an assistant tasked with answering questions using the provided notes. Retrieve and synthesize relevant information to form a complete, accurate, and clear response. Focus only on the information found in the notes. 
+        You are an assistant tasked with answering questions using the provided document. Retrieve and synthesize relevant information to form a complete, accurate, and clear response. Focus only on the information found in the notes. 
         If the notes do not contain enough information, state that explicitly.
         Use as many of the notes as much as possible to synthesize a coherent answer. Do not put the document ids when responding.
             Notes: {results}

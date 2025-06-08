@@ -5,12 +5,6 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import file_upload
 
 embedding_model = HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
-vector_store = Chroma(
-    collection_name=f"{file_upload.hash}",
-    embedding_function = embedding_model,
-    persist_directory="./"
-)
-
 
 def sendToLLM(results, query):
     prompt_template=f"""
@@ -40,7 +34,12 @@ def sendToLLM(results, query):
 
     return completion
 
-def search(query, numResults):
+def search(query, numResults, hash):
+    vector_store = Chroma(
+        collection_name=f"{hash[:7]}",
+        embedding_function = embedding_model,
+        persist_directory="./"
+    )   
     results = vector_store.similarity_search_by_vector_with_relevance_scores(
         embedding=embedding_model.embed_query(query), k=numResults
     )
