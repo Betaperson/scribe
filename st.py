@@ -3,18 +3,31 @@ from openai import OpenAI
 import os
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
-#import file_upload
 import search
 import nest_asyncio
 import asyncio
 import hashlib
 import file_upload
+import json
+import cProfile
+import dotenv
 
 nest_asyncio.apply()
+
+@st.cache_data(show_spinner="Processing PDF...")
+
+def process_pdf_cached(file_bytes):
+    file_hash = hashlib.md5(file_bytes).hexdigest()[:7]
+    with open(f"{file_hash}.pdf", "wb") as f:
+        f.write(file_bytes)
+    totalMD = asyncio.run(file_upload.pdfLoader(f"{file_hash}.pdf"))
+    file_upload.createStore(totalMD, file_hash)
+    return totalMD, file_hash
+
 #os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-global hash
-
+#global hash
+dotenv.load_dotenv()
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.getenv("GROQ_API_KEY")
@@ -23,11 +36,24 @@ client = OpenAI(
 uploaded_file = st.file_uploader("Choose a file", type="pdf")
 if uploaded_file is not None:
     bytesdata = uploaded_file.getvalue()
-    hash = hashlib.md5(bytesdata).hexdigest()
-    with open(f"{hash[:7]}.pdf", "wb") as f:
-        f.write(bytesdata)
-    totalMD = asyncio.run(file_upload.pdfLoader(f"{hash[:7]}.pdf"))
-    file_upload.createStore(totalMD, hash[:7])
+    totalMD, hash = process_pdf_cached(bytesdata)
+    #with open(f"{hash[:7]}.pdf", "wb") as f:
+    #    f.write(bytesdata)
+    #totalMD = asyncio.run(file_upload.pdfLoader(f"{hash[:7]}.pdf"))
+    #file_upload.createStore(totalMD, hash[:7])
+
+
+    #try:
+    #    with open("files.json", "r") as f:
+    #        data = json.load(f)
+    #except FileNotFoundError:
+    #    data = {}
+
+    #if hash not in data:
+    #    data[hash] = {"processed": True}
+    #    with open("files.json", "w") as f:
+    #        json.dump(data, f)]
+
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -45,18 +71,16 @@ if prompt := st.chat_input("Type to get started."):
             Notes: {results}
             Question: {prompt}
     """
-    st.session_state.messages.append({"role": "user", "content": prompt_template})
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-
+        api_messages = st.session_state.messages[:-1]
+        api_messages.append({"role": "user", "content": prompt_template})
         stream = client.chat.completions.create(
             model = "meta-llama/llama-4-maverick-17b-128e-instruct",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
+            messages=api_messages,
             stream=True,
         )
         response = st.write_stream(stream)

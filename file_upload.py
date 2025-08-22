@@ -11,6 +11,16 @@ from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
+
+@lru_cache(maxsize=1)
+def get_openai_client():
+    dotenv.load_dotenv()
+    return OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY")
+    )
 
 hash = "NaN"
 text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
@@ -20,18 +30,13 @@ text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
 embedding_model = HuggingFaceEmbeddings(model_name = "sentence-transformers/all-MiniLM-L6-v2")
 
 def imgToMDRouter(img):
-    dotenv.load_dotenv()
-
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    )
+    client = get_openai_client()
 
     completion = client.chat.completions.create(
         model="google/gemma-3-27b-it:free",
         messages=[
             {
-                "role": "user", 
+                "role": "user",
                 "content": [
                     {
                         "type": "text",
@@ -101,7 +106,7 @@ Now, convert the following PDF into Markdown, adhering to the examples above. Pa
                     },
                     {
                         "type": "image_url",
-                        "image_url":{ 
+                        "image_url":{
                             "url": f"data:image/jpeg;base64,{img}"
                             }
                     }
@@ -111,6 +116,7 @@ Now, convert the following PDF into Markdown, adhering to the examples above. Pa
     )
     return completion.choices[0].message.content
 
+#can be reused for incorrect conversions
 def pdf_to_base_64(pdf_path: str, page_number: int):
     pdf_doocument = fitz.open(pdf_path)
     page = pdf_doocument.load_page(page_number)
@@ -120,17 +126,40 @@ def pdf_to_base_64(pdf_path: str, page_number: int):
     image.save(buffer, format="JPEG")
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-async def pdfLoader(path):
+def pdf_to_base64_batch(pdf_path: str, pages: list) -> list:
+    pdf_document = fitz.open(pdf_path)
+    results  = []
+
+    try:
+        for page in pages:
+            curPage = pdf_document.load_page(page)
+            image = curPage.get_pixmap()
+            pil_image = Image.frombytes("RGB", [image.width, image.height], image.samples)
+            buffer = io.BytesIO()
+            pil_image.save(buffer, format="JPEG")
+            base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            results.append((page, base64_img))
+    finally:
+        pdf_document.close()
+
+    return results
+
+async def pdfLoader(path: str) -> str:
     loader = PyPDFLoader(file_path=path)
     pages = []
+    first_page = None
     async for page in loader.alazy_load():
-        pages.append(page)
-    totalpages = pages[0].metadata["total_pages"]
-    totalmarkdown = ""
-    for pagenum in range(totalpages):
-        img = pdf_to_base_64(path, pagenum)
-        totalmarkdown += imgToMDRouter(img)
-    return totalmarkdown
+        first_page = page
+        break
+    totalpages = first_page.metadata["total_pages"]
+    all_images = pdf_to_base64_batch(path, list(range(totalpages)))
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(imgToMDRouter, img)
+                  for _, img in all_images]
+        results = [future.result() for future in futures]
+
+    return "\n\n".join(results)
 
 def createStore(totalMD, filehash):
     vector_store = Chroma(
