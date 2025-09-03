@@ -9,7 +9,6 @@ import asyncio
 import hashlib
 import file_upload
 import json
-import cProfile
 import dotenv
 
 nest_asyncio.apply()
@@ -20,6 +19,7 @@ def process_pdf_cached(file_bytes):
     file_hash = hashlib.md5(file_bytes).hexdigest()[:7]
     with open(f"{file_hash}.pdf", "wb") as f:
         f.write(file_bytes)
+    st.toast(f"File Saved as: {file_hash}.pdf")
     totalMD = asyncio.run(file_upload.pdfLoader(f"{file_hash}.pdf"))
     file_upload.createStore(totalMD, file_hash)
     return totalMD, file_hash
@@ -36,6 +36,7 @@ client = OpenAI(
 uploaded_file = st.file_uploader("Choose a file", type="pdf")
 if uploaded_file is not None:
     bytesdata = uploaded_file.getvalue()
+    st.toast("File Uploaded")
     totalMD, hash = process_pdf_cached(bytesdata)
     #with open(f"{hash[:7]}.pdf", "wb") as f:
     #    f.write(bytesdata)

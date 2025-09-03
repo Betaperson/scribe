@@ -14,7 +14,12 @@ A Python-based document processing and Q&A application that allows users to uplo
 
 - Python 3.11+
 - Conda (recommended for environment management)
+- Streamlit
+- ChromaDB
 
 ## Installation
 
-Coming soon.
+1. Clone the Repository using `git clone`
+2. Run `streamlit run st.py`
+
+Docker Installation is in development.
